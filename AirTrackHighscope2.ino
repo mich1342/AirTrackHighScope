@@ -1,0 +1,274 @@
+//Sample using LiquidCrystal library
+#include <LiquidCrystal.h>
+
+/*******************************************************
+
+  This program will test the LCD panel and the buttons
+  Mark Bramwell, July 2010
+
+********************************************************/
+
+// select the pins used on the LCD panel
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+
+// define some values used by the panel and buttons
+int lcd_key     = 0;
+int adc_key_in  = 0;
+#define btnRIGHT  0
+#define btnUP     1
+#define btnDOWN   2
+#define btnLEFT   3
+#define btnSELECT 4
+#define btnNONE   5
+
+
+const int eeAddress = 0;
+#include <EEPROM.h>
+int Lenght;
+int prev_Lenght = 0;
+// read the buttons
+int read_LCD_buttons()
+{
+  adc_key_in = analogRead(0);      // read the value from the sensor
+  // my buttons when read are centered at these valies: 0, 144, 329, 504, 741
+  // we add approx 50 to those values and check to see if we are close
+  if (adc_key_in > 1000) return btnNONE; // We make this the 1st option for speed reasons since it will be the most likely result
+  // For V1.1 us this threshold
+  if (adc_key_in < 50)   return btnRIGHT;
+  if (adc_key_in < 250)  return btnUP;
+  if (adc_key_in < 450)  return btnDOWN;
+  if (adc_key_in < 650)  return btnLEFT;
+  if (adc_key_in < 850)  return btnSELECT;
+
+  // For V1.0 comment the other threshold and use the one below:
+  /*
+    if (adc_key_in < 50)   return btnRIGHT;
+    if (adc_key_in < 195)  return btnUP;
+    if (adc_key_in < 380)  return btnDOWN;
+    if (adc_key_in < 555)  return btnLEFT;
+    if (adc_key_in < 790)  return btnSELECT;
+  */
+
+
+  return btnNONE;  // when all others fail, return this...
+}
+
+int delayButton = 300;
+int state = 0;
+int prev_state = 9999;
+
+float dt1, dt2, T = 0;
+float dw1, dw2, W = 0;
+
+void setup()
+{
+  lcd.begin(16, 2);              // start the library
+  lcd.setCursor(2, 0);
+  lcd.print("SGU Robotics"); // print a simple message
+  lcd.setCursor(6, 1);
+  lcd.print("V1.2");
+  delay(2000);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Michael Jonathan");
+  Lenght = EEPROM.read(eeAddress);
+}
+
+void loop()
+{
+  lcd_key = read_LCD_buttons();
+  switch (state) {
+    case 0:
+      if (state != prev_state) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Run");
+        lcd.setCursor(0, 1);
+        lcd.print("<L            R>");
+        prev_state = state;
+      }
+      if ((lcd_key == btnRIGHT) || (lcd_key == btnLEFT)) {
+        state = 1;
+        delay(delayButton);
+      }
+      if (lcd_key == btnSELECT) {
+        state = 100;
+        delay(delayButton);
+      }
+      break;
+
+    case 1:
+      if (state != prev_state) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Settings");
+        lcd.setCursor(0, 1);
+        lcd.print("<L            R>");
+        prev_state = state;
+      }
+
+      if ((lcd_key == btnRIGHT) || (lcd_key == btnLEFT)) {
+        state = 0;
+        delay(delayButton);
+      }
+
+      if (lcd_key == btnSELECT) {
+        state = 2;
+        delay(delayButton);
+      }
+      break;
+
+    case 2:
+      if (state != prev_state) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Settings");
+
+        lcd.setCursor(0, 1);
+        lcd.print("<L -> Lenght  R>");
+        prev_state = state;
+      }
+      if ((lcd_key == btnRIGHT) || (lcd_key == btnLEFT)) {
+        state = 3;
+        delay(delayButton);
+      }
+      if (lcd_key == btnSELECT) {
+        state = 4;
+        delay(delayButton);
+      }
+      break;
+
+    case 3:
+      if (state != prev_state) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Settings");
+        lcd.setCursor(0, 1);
+        lcd.print("<L -> Info    R>");
+        prev_state = state;
+      }
+      if ((lcd_key == btnRIGHT) || (lcd_key == btnLEFT)) {
+        state = 2;
+        delay(delayButton);
+      }
+      break;
+
+    case 4:
+      if ((state != prev_state) || (lcd_key == btnUP) || (lcd_key == btnDOWN) || (Lenght != prev_Lenght)) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Lenght :");
+        lcd.setCursor(1, 1);
+        lcd.print(Lenght);
+        lcd.setCursor(10, 1);
+        lcd.print("mm");
+
+        updateLenght();
+        prev_state = state;
+      }
+      if (lcd_key == btnUP) {
+        Lenght = Lenght + 1;
+        delay(delayButton);
+      }
+      if ((lcd_key == btnDOWN) && (Lenght > 0)) {
+        Lenght = Lenght - 1;
+
+        delay(delayButton);
+      }
+      if (lcd_key == btnSELECT) {
+        state = 0;
+
+        delay(delayButton);
+      }
+
+      break;
+
+    case 100:
+      if (state != prev_state) {
+        lcd.clear();
+        lcd.print("Waiting...");
+        prev_state = state;
+      }
+      if (digitalRead(A1) == 1) {
+        dt1 = micros();
+        state = 101;
+      }
+      break;
+
+    case 101:
+      if (digitalRead(A1) == 0) {
+        dt2 = micros();
+        if (dt2 < dt1) {
+          dt2 = dt2 + dt1;
+        }
+        state = 102;
+      }
+      break;
+
+    case 102:
+      if (digitalRead(A2) == 1) {
+        dw1 = micros();
+        state = 103;
+      }
+      break;
+
+    case 103:
+      if (digitalRead(A2) == 0) {
+        dw2 = micros();
+        if (dw2 < dw1) {
+          dw2 = dw2 + dw1;
+        }
+        state = 104;
+      }
+      break;
+
+
+
+    case 104:
+      if (state != prev_state) {
+        dt1 = dt1 / 1000000;
+        dt2 = dt2 / 1000000;
+
+        dw1 = dw1 / 1000000;
+        dw2 = dw2 / 1000000;
+
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("V1 :");
+        lcd.setCursor(6, 0);
+        T = (Lenght) / ((dt2 - dt1) * 1000);
+
+        lcd.print(T);
+        lcd.setCursor(10, 0);
+        lcd.print("m/s");
+
+
+        lcd.setCursor(0, 1);
+        lcd.print("V2 :");
+        lcd.setCursor(6, 1);
+        W = (Lenght) / ((dw2 - dw1) * 1000);
+
+        lcd.print(W);
+        lcd.setCursor(10, 1);
+        lcd.print("m/s");
+
+
+        prev_state = state;
+      }
+
+      if (lcd_key == btnSELECT) {
+        state = 0;
+        delay(delayButton);
+      }
+  }
+}
+
+void updateLenght() {
+  if (Lenght != prev_Lenght) {
+    if (Lenght <= 0) {
+      Lenght = 0;
+    }
+    EEPROM.write(eeAddress, Lenght);
+    prev_Lenght = Lenght;
+  }
+}
